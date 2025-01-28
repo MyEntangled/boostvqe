@@ -1,12 +1,11 @@
 import numpy as np
 import quimb.tensor as qtn
 import quimb as qu
-import matplotlib.pyplot as plt
 
 from typing import List
 
-from compile_gates import unitary_to_gates
-from mps_to_circuit import disentangling_gates
+from boostvqe.src.boostvqe.new_code.mps_warmstart.compile_gates import unitary_to_gates
+from boostvqe.src.boostvqe.new_code.mps_warmstart.mps_to_unitaries import disentangling_gates
 
 #qtn.set_contract_backend('jax')
 #qtn.set_tensor_linop_backend('jax')
@@ -32,7 +31,7 @@ def create_circuit_from_gate_unitaries(unitaries:List[List[np.array]]):
                 if len(params) > 0:
                     yield qtn.Gate(gate_name, params=params, qubits=[qubits_involved[q] for q in qubit_order], round=i)
                 else:
-                    yield qtn.Gate(gate_name, params=None, qubits=[qubits_involved[q] for q in qubit_order], round=i)
+                    yield qtn.Gate(gate_name, params=[], qubits=[qubits_involved[q] for q in qubit_order], round=i)
 
 
 if __name__ == "__main__":

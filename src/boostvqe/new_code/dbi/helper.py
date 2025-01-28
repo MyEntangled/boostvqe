@@ -1,0 +1,54 @@
+import quimb.tensor as qtn
+import numpy as np
+
+def append_circuits(circuit1, circuit2):
+    # Append all gates from circuit2 to circuit1
+    # for gate in circuit2.gates:
+    #     circuit1.apply_gate(gate)
+    # return circuit1
+
+    circuit1.apply_gates(gates=circuit2.gates)
+    return circuit1
+
+
+def invert_circuit(circuit):
+    inverse_circuit = qtn.Circuit(circuit.N)
+
+    # Reverse the gate application
+    for gate in reversed(circuit.gates):
+        label = gate.label
+        qubits = gate.qubits
+
+        if gate.params is None:
+            params = None
+        else:
+            if label == 'U3':
+                params = [-gate.params[0], -gate.params[2], -gate.params[1]]
+            else:
+                params = [-p for p in gate.params] # Negate parameters
+
+        #inverse_circuit.apply_gate(label, params, *qubits)
+        gate_to_apply = qtn.Gate(label, params, qubits)
+        inverse_circuit.apply_gate(gate_to_apply)
+
+    return inverse_circuit
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    qc1 = qtn.CircuitMPS(4)
+    qc1.x(0)
+    qc1.x(1)
+
+    qc2 = qtn.CircuitMPS(4)
+    qc2.h(1)
+    qc2.h(2)
+
+    qc = append_circuits(qc1, qc2)
+
+    print(qc.gates)
+    qc_inv = invert_circuit(qc)
+    print(qc_inv.gates)
+
+

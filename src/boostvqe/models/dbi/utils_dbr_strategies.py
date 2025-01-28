@@ -28,23 +28,23 @@ def select_best_dbr_generator(
 
     Example:
         from qibo.hamiltonians import Hamiltonian
-        from qibo.models.dbi.double_bracket import *
-        from qibo.models.dbi.utils_dbr_strategies import select_best_dbr_generator
+        from qibo.models.dbi_circuit.double_bracket import *
+        from qibo.models.dbi_circuit.utils_dbr_strategies import select_best_dbr_generator
         from qibo.quantum_info import random_hermitian
 
         nqubits = 3
         NSTEPS = 3
         h0 = random_hermitian(2**nqubits)
-        dbi = DoubleBracketIteration(
+        dbi_circuit = DoubleBracketIteration(
             Hamiltonian(nqubits, h0),
             mode=DoubleBracketGeneratorType.single_commutator,
         )
-        initial_off_diagonal_norm = dbi.off_diagonal_norm
+        initial_off_diagonal_norm = dbi_circuit.off_diagonal_norm
         generate_local_Z = generate_Z_operators(nqubits)
         Z_ops = list(generate_local_Z.values())
         for _ in range(NSTEPS):
-            dbi, idx, step, flip_sign = select_best_dbr_generator(
-                dbi, Z_ops, compare_canonical=True
+            dbi_circuit, idx, step, flip_sign = select_best_dbr_generator(
+                dbi_circuit, Z_ops, compare_canonical=True
                 )
     """
     if scheduling is None:
@@ -246,33 +246,33 @@ def gradient_descent(
     Example:
         from qibo import set_backend
         from qibo.hamiltonians import Hamiltonian
-        from qibo.models.dbi.double_bracket import *
-        from qibo.models.dbi.utils import *
-        from qibo.models.dbi.utils_dbr_strategies import gradient_descent
+        from qibo.models.dbi_circuit.double_bracket import *
+        from qibo.models.dbi_circuit.utils import *
+        from qibo.models.dbi_circuit.utils_dbr_strategies import gradient_descent
         from qibo.quantum_info import random_hermitian
 
         nqubits = 3
         NSTEPS = 5
         set_backend("numpy")
         h0 = random_hermitian(2**nqubits)
-        dbi = DoubleBracketIteration(
+        dbi_circuit = DoubleBracketIteration(
             Hamiltonian(nqubits, h0),
             mode=DoubleBracketGeneratorType.single_commutator,
             scheduling=DoubleBracketScheduling.hyperopt,
             cost=DoubleBracketCostFunction.off_diagonal_norm,
         )
-        initial_off_diagonal_norm = dbi.off_diagonal_norm
+        initial_off_diagonal_norm = dbi_circuit.off_diagonal_norm
         pauli_operator_dict = generate_pauli_operator_dict(
             nqubits, parameterization_order=1
         )
         pauli_operators = list(pauli_operator_dict.values())
         # let initial d be approximation of $\Delta(H)
         d_coef_pauli = decompose_into_Pauli_basis(
-            dbi.diagonal_h_matrix, pauli_operators=pauli_operators
+            dbi_circuit.diagonal_h_matrix, pauli_operators=pauli_operators
         )
         d_pauli = sum([d_coef_pauli[i] * pauli_operators[i] for i in range(nqubits)])
         loss_hist_pauli, d_params_hist_pauli, s_hist_pauli = gradient_descent(
-            dbi,
+            dbi_circuit,
             NSTEPS,
             d_coef_pauli,
             ParameterizationTypes.pauli,

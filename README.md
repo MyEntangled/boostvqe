@@ -32,7 +32,7 @@ It follows a python snippet explaining how to run the boosting
 from boostvqe.boost import dbqa_vqe
 from boostvqe.ansatze import hdw_efficient
 
-from qibo.models.dbi.double_bracket import DoubleBracketGeneratorType
+from qibo.models.dbi_circuit.double_bracket import DoubleBracketGeneratorType
 
 circuit = hdw_efficient(nqubits=2, nlayers=2)
 output_folder = "output"

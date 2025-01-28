@@ -16,19 +16,19 @@ def generate_Z_operators(nqubits: int, backend=None):
      Example:
         .. testcode::
 
-            from qibo.models.dbi.utils import generate_Z_operators
-            from qibo.models.dbi.double_bracket import DoubleBracketIteration
+            from qibo.models.dbi_circuit.utils import generate_Z_operators
+            from qibo.models.dbi_circuit.double_bracket import DoubleBracketIteration
             from qibo.quantum_info import random_hermitian
             from qibo.hamiltonians import Hamiltonian
             import numpy as np
 
             nqubits = 4
             h0 = random_hermitian(2**nqubits)
-            dbi = DoubleBracketIteration(Hamiltonian(nqubits=nqubits, matrix=h0))
+            dbi_circuit = DoubleBracketIteration(Hamiltonian(nqubits=nqubits, matrix=h0))
             generate_Z = generate_Z_operators(nqubits)
             Z_ops = list(generate_Z.values())
 
-            delta_h0 = dbi.diagonal_h_matrix
+            delta_h0 = dbi_circuit.diagonal_h_matrix
             dephasing_channel = (sum([Z_op @ h0 @ Z_op for Z_op in Z_ops])+h0)/2**nqubits
             norm_diff = np.linalg.norm(delta_h0 - dephasing_channel)
     """
@@ -55,7 +55,7 @@ def str_to_symbolic(name: str):
     Example:
         .. testcode::
 
-            from qibo.models.dbi.utils import str_to_symbolic
+            from qibo.models.dbi_circuit.utils import str_to_symbolic
             op_name = "ZYXZI"
             # returns 5-qubit symbolic hamiltonian
             ZIXZI_op = str_to_symbolic(op_name)

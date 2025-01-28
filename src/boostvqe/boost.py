@@ -164,7 +164,7 @@ def dbqa_vqe(
 
     # vqe lists
     params_history, loss_history, grads_history, fluctuations = {}, {}, {}, {}
-    # dbi lists
+    # dbi_circuit lists
     boost_energies, boost_fluctuations_dbi, boost_steps, boost_d_matrix = {}, {}, {}, {}
     # hamiltonian history
     fun_eval, hamiltonians_history = [], []
@@ -245,7 +245,7 @@ def dbqa_vqe(
             for gate in reversed([old_circ_matrix] + dbi_operators):
                 circ.add(gates.Unitary(gate, *range(nqubits), trainable=False))
             hamiltonians_history.extend(dbi_hamiltonians)
-            # append dbi results
+            # append dbi_circuit results
             dbi_fluctuations.insert(0, fluctuations_h0)
             dbi_energies.insert(0, energy_h0)
             boost_fluctuations_dbi[b] = np.array(dbi_fluctuations)

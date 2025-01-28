@@ -68,7 +68,7 @@ class DoubleBracketIteration:
     Example:
         .. testcode::
 
-            from qibo.models.dbi.double_bracket import DoubleBracketIteration, DoubleBracketGeneratorType
+            from qibo.models.dbi_circuit.double_bracket import DoubleBracketIteration, DoubleBracketGeneratorType
             from qibo.quantum_info import random_hermitian
             from qibo.hamiltonians import Hamiltonian
 

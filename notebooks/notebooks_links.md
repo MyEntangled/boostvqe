@@ -22,7 +22,7 @@ When you want a simple DBI take D(B) = \sum_i B_i Z_i
 
 https://github.com/qiboteam/qibo/tree/dbi_magnetic_field
 
-Marek’s developing branch for transpiling DBI into Hamiltonian simulation (and then to primitive gates) has the evolution oracle examples in the models/dbi folder https://github.com/qiboteam/qibo/tree/DBI_transpiling_code_structure_waiting_merge/src/qibo/models/dbi
+Marek’s developing branch for transpiling DBI into Hamiltonian simulation (and then to primitive gates) has the evolution oracle examples in the models/dbi_circuit folder https://github.com/qiboteam/qibo/tree/DBI_transpiling_code_structure_waiting_merge/src/qibo/models/dbi
 
 https://github.com/qiboteam/qibo/tree/DBI_transpiling_code_structure_waiting_merge/src/qibo/models/dbi
 

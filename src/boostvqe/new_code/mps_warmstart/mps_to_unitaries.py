@@ -74,7 +74,7 @@ def truncated_mps_to_circuit(mps:qtn.MatrixProductState):
             G_tensor_list.append(G_tensor)
 
         elif n > 0:
-            G = np.zeros(shape=(2,2,2,2))
+            G = np.zeros(shape=(2,2,2,2), dtype='complex')
             A = mps[n].data
 
             G[0,:,:,:] = A
@@ -101,7 +101,7 @@ def truncated_mps_to_circuit(mps:qtn.MatrixProductState):
             G_tensor_list.append(G_tensor)
 
         else: # n = 0
-            G = np.zeros(shape=(2,2,2,2))
+            G = np.zeros(shape=(2,2,2,2), dtype='complex')
             A = mps[n].data
             #print(A.shape)
             G[0,0,:,:] = A
@@ -289,7 +289,7 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
     zero_mps = qtn.MPS_computational_state('0'*input_mps.num_tensors)
 
     if hamiltonian is not None:
-        from create_mps_circuit import create_circuit_from_gate_unitaries ## HACKY TRICK, ONLY USED TO SHOW ENERGY
+        from boostvqe.src.boostvqe.new_code.mps_warmstart.create_mps_circuit import create_circuit_from_gate_unitaries ## HACKY TRICK, ONLY USED TO SHOW ENERGY
 
 
     for k in range(num_layers):

@@ -181,8 +181,8 @@ def rotate_h_with_vqe(hamiltonian, vqe):
     return new_hamiltonian
 
 
-def apply_dbi_steps(dbi, nsteps, d_type=None, method=None, time_step=0.01, **kwargs):
-    """Apply `nsteps` of `dbi` to `hamiltonian`."""
+def apply_dbi_steps(dbi_circuit, nsteps, d_type=None, method=None, time_step=0.01, **kwargs):
+    """Apply `nsteps` of `dbi_circuit` to `hamiltonian`."""
     nqubits = dbi.nqubits
 
     p0 = [time_step]
@@ -443,7 +443,7 @@ def optimize_D(
 
 def optimize_d_for_dbi(
     params,
-    dbi,
+    dbi_circuit,
     d_type,
     method,
     s_bounds=(-1e-1, 1e-1),
@@ -515,7 +515,7 @@ def optimize_d_for_dbi(
     return opt_results.x, {f"{method}_extras": convert_numpy(dict(opt_results))}
 
 
-def loss_function_d_dbi(dbi_params, dbi, d_type):
+def loss_function_d_dbi(dbi_params, dbi_circuit, d_type):
     """``params`` has shape [s0, b_list_0]."""
     test_dbi = copy.deepcopy(dbi)
     d = d_type.load(dbi_params[1:]).h.matrix
