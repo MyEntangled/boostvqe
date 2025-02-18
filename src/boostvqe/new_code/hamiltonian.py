@@ -26,7 +26,7 @@ def build_xxz_hamiltonian(n_sites, couplings):
             coeffs.append(Jz)
             sites.append([i, i + 1])
 
-            # Add transverse field term
+    # Add transverse field term
     for i in range(n_sites):
         mpo_terms.append((2 * h, i, 'Z'))
         paulis.append('Z')
@@ -36,15 +36,20 @@ def build_xxz_hamiltonian(n_sites, couplings):
     H = [coeffs, paulis, sites]
 
     # Builtd the MPO
-    mpo = qtn.SpinHam1D(S=0.5)
-    for term in mpo_terms:
-        if len(term) == 5:
-            coeff, site1, site2, op1, op2 = term
-            mpo[site1, site2] += coeff, op1, op2
-        elif len(term) == 3:
-            coeff, site, op = term
-            mpo[site] += coeff, op
+    # mpo = qtn.SpinHam1D(S=0.5)
+    # for term in mpo_terms:
+    #     if len(term) == 5:
+    #         coeff, site1, site2, op1, op2 = term
+    #         mpo[site1, site2] += coeff, op1, op2
+    #     elif len(term) == 3:
+    #         coeff, site, op = term
+    #         mpo[site] += coeff, op
 
+    mpo = qtn.SpinHam1D(S=0.5, cyclic=None)
+    mpo += 4 * Jx, 'X', 'X'
+    mpo += 4 * Jy, 'Y', 'Y'
+    mpo += 4 * Jz, 'Z', 'Z'
+    mpo += 2 * h, 'Z'
     return mpo.build_mpo(n_sites), H
 
 

@@ -1,4 +1,4 @@
-from boostvqe.src.boostvqe.new_code.vqe.vqe_ansatz import double_ladder_ansatz
+from src.boostvqe.new_code.vqe.vqe_ansatz import double_ladder_ansatz
 
 import quimb.tensor as qtn
 import quimb as qu

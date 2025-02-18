@@ -4,8 +4,8 @@ import quimb as qu
 
 from typing import List
 
-from boostvqe.src.boostvqe.new_code.mps_warmstart.compile_gates import unitary_to_gates
-from boostvqe.src.boostvqe.new_code.mps_warmstart.mps_to_unitaries import disentangling_gates
+from src.boostvqe.new_code.mps_warmstart.compile_gates import unitary_to_gates
+from src.boostvqe.new_code.mps_warmstart.mps_to_unitaries import disentangling_gates
 
 #qtn.set_contract_backend('jax')
 #qtn.set_tensor_linop_backend('jax')

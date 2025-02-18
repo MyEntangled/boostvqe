@@ -1,9 +1,11 @@
 import numpy as np
 import scipy
 import quimb.tensor as qtn
+import quimb as qu
 from quimb.tensor import MatrixProductState
 
 from typing import List
+
 
 # qtn.set_contract_backend('jax')
 # qtn.set_tensor_linop_backend('jax')
@@ -273,6 +275,11 @@ def reorder_indices(mps:qtn.MatrixProductState) -> qtn.MatrixProductState:
         tensor.transpose_(*desired_order)
 
 def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hamiltonian=None):
+    if hamiltonian is not None:
+        from src.boostvqe.new_code.mps_warmstart.create_mps_circuit import create_circuit_from_gate_unitaries ## HACKY TRICK, ONLY USED TO SHOW ENERGY
+    ## Create a zero MPS state that is the desired output after disentangling.
+    zero_mps = qtn.MPS_computational_state('0'*input_mps.num_tensors)
+
     mps_list = []
     temp = input_mps.copy()
     for n in range(temp.num_tensors-1):
@@ -284,13 +291,8 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
     max_bond = mps_list[0].max_bond()
     circuit_unitaries = []
 
-    # zero_state = np.zeros(2 ** input_mps.num_tensors)
-    # zero_state[0] = 1
-    zero_mps = qtn.MPS_computational_state('0'*input_mps.num_tensors)
-
-    if hamiltonian is not None:
-        from boostvqe.src.boostvqe.new_code.mps_warmstart.create_mps_circuit import create_circuit_from_gate_unitaries ## HACKY TRICK, ONLY USED TO SHOW ENERGY
-
+    energy = None
+    gs_overlap = None
 
     for k in range(num_layers):
         mps = mps_list[k]
@@ -307,6 +309,7 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
             unitary_list, tensor_list = output
 
         output_mps = output_to_mps_new(tensor_list, state_mps=mps, max_bond=min(max_bond*num_layers,128))
+        output_mps.normalize()
 
         reindex_map = {f'b{i}': f'k{i}' for i in range(output_mps.num_tensors)}
 
@@ -317,7 +320,8 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
         mps_list.append(output_mps)
         circuit_unitaries.append(unitary_list)
 
-        print('Output quality', abs(zero_mps.H @ output_mps)**2)
+        gs_overlap = abs(zero_mps.H @ output_mps)**2
+        print('Output quality', gs_overlap)
 
         if hamiltonian is not None:
             circ = qtn.CircuitMPS(input_mps.num_tensors)
@@ -330,15 +334,41 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
             print('Circuit gates:', circ.num_gates)
             print('Energy', energy)
         print('--')
-    return circuit_unitaries
+
+        if gs_overlap > 0.99999:
+            break
+
+    return circuit_unitaries, gs_overlap, energy
 
 
 if __name__ == "__main__":
 
-    nqubits = 30
-    bond_dim = 10
+    nqubits = 20
+    bond_dim = 4
     psi = qtn.MPS_rand_state(nqubits, bond_dim=bond_dim, phys_dim=2, cyclic=False, normalize=True)
+    print(psi.max_bond())
 
+    from src.boostvqe.new_code.hamiltonian import build_xxz_hamiltonian
+    Jx = 1  # Coupling in the x-direction
+    Jy = 1  # Coupling in the y-direction
+    Jz = 1  # Coupling in the z-direction
+    h = +0.5  # Transverse field strength
+    #couplings = np.array([Jx, Jy, Jz, h]) / nqubits
+    #couplings = np.array([Jx, Jy, Jz, h])
+
+    # Build the Hamiltonian
+    ham_build, H = build_xxz_hamiltonian(nqubits, [Jx, Jy, Jz, h])
+    ham = qtn.MPO_ham_heis(nqubits, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
+
+    print((ham_build - ham).norm())
+    bond_dims = [4]
+    dmrg = qtn.DMRG2(ham, bond_dims=bond_dims, cutoffs=1e-6)
+    res = dmrg.solve(verbosity=0)
+    dmrg.solve()
+    psi = dmrg.state
+    print(psi.max_bond())
+
+    print(psi.shape)
     circuit_unitaries = disentangling_gates(psi, num_layers=100)
     print(len(circuit_unitaries))
     #
