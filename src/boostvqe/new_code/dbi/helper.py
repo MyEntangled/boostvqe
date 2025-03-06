@@ -25,7 +25,10 @@ def invert_circuit(circuit):
             if label == 'U3':
                 params = [-gate.params[0], -gate.params[2], -gate.params[1]]
             else:
-                params = [-p for p in gate.params] # Negate parameters
+                try:
+                    params = [-p for p in gate.params]  # Negate parameters
+                except TypeError:
+                    params = None
 
         #inverse_circuit.apply_gate(label, params, *qubits)
         gate_to_apply = qtn.Gate(label, params, qubits)

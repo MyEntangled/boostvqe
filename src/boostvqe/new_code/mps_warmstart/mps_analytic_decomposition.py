@@ -6,14 +6,9 @@ from quimb.tensor import MatrixProductState
 
 from typing import List
 
+from src.boostvqe.new_code.mps_warmstart.create_mps_circuit import generate_gates_from_unitaries
+from src.boostvqe.new_code.mps_warmstart.helper import is_unitary, apply_circuit_mps
 
-# qtn.set_contract_backend('jax')
-# qtn.set_tensor_linop_backend('jax')
-
-#autoray.register_function('quimb', 'transpose', qtn.Tensor.transpose)
-
-def is_unitary(U):
-    return np.allclose(U.conj().T @ U, np.eye(U.shape[0]))
 
 def canonicalize(mps:qtn.MatrixProductState):
     mps.right_canonize()
@@ -132,72 +127,16 @@ def truncated_mps_to_circuit(mps:qtn.MatrixProductState):
 
     return G_gate_list, G_tensor_list
 
-def output_to_mps(psi:qtn.Tensor, bond_dim:int=None) -> MatrixProductState:
-    # The input tensor is assumed to have shape [2]*n
-    n = len(psi.inds)
-    site_ind_id = 'k{}'
-    site_tag_id = 'I{}'
-
-    # Initialize an empty MPS object
-    mps = qtn.MatrixProductState.new(L=n,
-                                     cyclic=False,
-                                     site_ind_id=site_ind_id,
-                                     site_tag_id=site_tag_id)
-
-    # Start with the initial tensor
-    current_tensor = psi
-
-    left_bond = None  # To track the previous virtual bond index
-
-    for i in range(n - 1):
-        left_inds = [f'b{i}']  # Physical index for the current node
-
-        # Add the previous bond index if it exists
-        if left_bond is not None:
-            left_inds += left_bond
-
-        #print(f'Spitting {i}', left_inds, right_inds)
-        # Perform SVD splitting
-        T1, current_tensor = current_tensor.split(
-            left_inds=left_inds,
-            #right_inds=right_inds,
-            method='eig',
-            absorb='right',
-            max_bond=bond_dim,
-            bond_ind = f'link_{i}_{i+1}'
-        )
-        T1.tags.clear()
-        T1.add_tag(f'I{i}')
-
-        left_bond = list(T1.bonds(current_tensor))  ## 'link_{i}_{i+1}'
-
-        # Update the MPS
-        mps.add_tensor(T1)
-
-    # Add the final tensor (last physical index and last virtual bond)
-    final_inds = [f'b{n - 1}']
-    if left_bond is not None:
-        final_inds += left_bond
-    current_tensor.tags.clear()
-    current_tensor.add_tag(f'I{n-1}')
-    mps.add_tensor(current_tensor)
-
-    reorder_indices(mps)
-    return mps
-
 def output_to_mps_new(tensor_list:List[qtn.Tensor], state_mps:qtn.MatrixProductState, max_bond:int) -> MatrixProductState:
     mps = qtn.MatrixProductState.new(L=len(tensor_list),
                                      cyclic=False,
                                      site_ind_id='k{}',
                                      site_tag_id='I{}')
 
-    #mps = qtn.TensorNetwork.new()
-
     ## Create the MPS
     for n in range(len(tensor_list)):
         G_tensor = tensor_list[n]
         state_tensor = state_mps[n]
-
 
         # Contract gate with corresponding qubit state
         #print('-----')
@@ -205,7 +144,6 @@ def output_to_mps_new(tensor_list:List[qtn.Tensor], state_mps:qtn.MatrixProductS
         #print('Gate:', G_tensor)
         #print('State:', state_tensor)
         tensor = (G_tensor | state_tensor)^...
-
 
         if n == 0:
             tensor.reindex_({'link_0_1': 'link_1_2'})
@@ -274,14 +212,15 @@ def reorder_indices(mps:qtn.MatrixProductState) -> qtn.MatrixProductState:
         # Reorder indices
         tensor.transpose_(*desired_order)
 
-def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hamiltonian=None):
-    if hamiltonian is not None:
-        from src.boostvqe.new_code.mps_warmstart.create_mps_circuit import create_circuit_from_gate_unitaries ## HACKY TRICK, ONLY USED TO SHOW ENERGY
+def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, num_layers:int=1, hamiltonian=None, fid_target=0.99):
+    if isinstance(psi_target, qtn.CircuitMPS):
+        psi_target = psi_target.psi
+
     ## Create a zero MPS state that is the desired output after disentangling.
-    zero_mps = qtn.MPS_computational_state('0'*input_mps.num_tensors)
+    zero_mps = qtn.MPS_computational_state('0' * psi_target.num_tensors)
 
     mps_list = []
-    temp = input_mps.copy()
+    temp = psi_target.copy()
     for n in range(temp.num_tensors-1):
         bond_ind = temp[n].bonds(temp[n+1]).pop()
         temp[n].reindex_({bond_ind: f'slink_{n}_{n+1}'})
@@ -289,14 +228,18 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
     mps_list.append(temp)
 
     max_bond = mps_list[0].max_bond()
+
     circuit_unitaries = []
+    qargs = []
+    if hamiltonian is not None:
+        circ = qtn.CircuitMPS(psi_target.num_tensors)
 
     energy = None
-    gs_overlap = None
+    fid = np.abs(zero_mps.H @ psi_target)
 
     for k in range(num_layers):
         mps = mps_list[k]
-        print(f'MPS layer {k+1}')
+        #print(f'MPS layer {k+1}')
 
         ## Truncating virtual bonds
         truncated_mps = qtn.tensor_1d_compress.tensor_network_1d_compress_dm(mps, max_bond=2, normalize=True)
@@ -311,64 +254,66 @@ def disentangling_gates(input_mps:qtn.MatrixProductState, num_layers:int=1, hami
         output_mps = output_to_mps_new(tensor_list, state_mps=mps, max_bond=min(max_bond*num_layers,128))
         output_mps.normalize()
 
-        reindex_map = {f'b{i}': f'k{i}' for i in range(output_mps.num_tensors)}
-
         # Apply reindexing to each tensor in the network
+        reindex_map = {f'b{i}': f'k{i}' for i in range(output_mps.num_tensors)}
         for tensor in output_mps:
             tensor.reindex_(reindex_map)
 
+        # Update the circuit (unitaries, qargs) with the new layer
         mps_list.append(output_mps)
-        circuit_unitaries.append(unitary_list)
+        circuit_unitaries = [unitary_list] + circuit_unitaries ## LATEST LAYER FIRST
+        layer_unitaries = circuit_unitaries[0]  # latest layer
+        layer_qargs = [(n, n + 1) for n in range(len(layer_unitaries) - 1)]
+        layer_qargs.append((len(layer_unitaries) - 1,))
+        qargs = [layer_qargs] + qargs
 
-        gs_overlap = abs(zero_mps.H @ output_mps)**2
-        print('Output quality', gs_overlap)
+        fid = np.abs(zero_mps.H @ output_mps)
+        #print('Output quality', fid)
 
         if hamiltonian is not None:
-            circ = qtn.CircuitMPS(input_mps.num_tensors)
-            gates_to_append = list(create_circuit_from_gate_unitaries(circuit_unitaries))
-            circ.apply_gates(gates_to_append,)
+            layer_gates = list(generate_gates_from_unitaries(circuit_unitaries[0], qargs[0]))
 
-            energy = (circ.psi.conj().reindex_(
-                {f'k{n}': f'b{n}' for n in range(circ.psi.num_tensors)}) | hamiltonian | circ.psi) ^ ...
+            full_circ = apply_circuit_mps(psi_target.num_tensors, layer_gates + list(circ.gates))
 
+            energy = (full_circ.psi.conj().reindex_(
+                {f'k{n}': f'b{n}' for n in range(full_circ.psi.num_tensors)}) | hamiltonian | full_circ.psi) ^ ...
+
+            circ = full_circ ## Update the circuit
             print('Circuit gates:', circ.num_gates)
             print('Energy', energy)
-        print('--')
+        #print('--')
 
-        if gs_overlap > 0.99999:
+        if fid > fid_target:
             break
 
-    return circuit_unitaries, gs_overlap, energy
+    return circuit_unitaries, qargs, fid, energy
 
 
 if __name__ == "__main__":
-
-    nqubits = 20
+    nqubits = 10
     bond_dim = 4
-    psi = qtn.MPS_rand_state(nqubits, bond_dim=bond_dim, phys_dim=2, cyclic=False, normalize=True)
-    print(psi.max_bond())
 
     from src.boostvqe.new_code.hamiltonian import build_xxz_hamiltonian
     Jx = 1  # Coupling in the x-direction
     Jy = 1  # Coupling in the y-direction
     Jz = 1  # Coupling in the z-direction
     h = +0.5  # Transverse field strength
-    #couplings = np.array([Jx, Jy, Jz, h]) / nqubits
-    #couplings = np.array([Jx, Jy, Jz, h])
 
     # Build the Hamiltonian
-    ham_build, H = build_xxz_hamiltonian(nqubits, [Jx, Jy, Jz, h])
+    #ham_build, H = build_xxz_hamiltonian(nqubits, [Jx, Jy, Jz, h])
     ham = qtn.MPO_ham_heis(nqubits, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
 
-    print((ham_build - ham).norm())
+    #print((ham_build - ham).norm())
     bond_dims = [4]
     dmrg = qtn.DMRG2(ham, bond_dims=bond_dims, cutoffs=1e-6)
     res = dmrg.solve(verbosity=0)
     dmrg.solve()
     psi = dmrg.state
-    print(psi.max_bond())
+    circ = qtn.CircuitMPS(N=psi.num_tensors, psi0=psi)
+    print(circ)
+    # print(psi.max_bond())
+    # print(psi.shape)
 
-    print(psi.shape)
-    circuit_unitaries = disentangling_gates(psi, num_layers=100)
-    print(len(circuit_unitaries))
-    #
+    circuit_unitaries, qargs, _, _ = analytic_decomposition(psi, hamiltonian=ham, num_layers=100)
+    print(len(circuit_unitaries), len(qargs))
+

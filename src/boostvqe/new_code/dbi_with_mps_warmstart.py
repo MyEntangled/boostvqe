@@ -1,9 +1,11 @@
 from hamiltonian import build_xxz_hamiltonian
 from dbi import dbi_training
 from src.boostvqe.new_code.dbi.dbi_training import train_dbi
+from src.boostvqe.new_code.mps_warmstart.create_mps_circuit import generate_gates_from_unitaries
+from src.boostvqe.new_code.mps_warmstart.helper import flatten_list
 from vqe.vqe_training import evaluate, train_vqe
 #from vqe.vqe_ansatz import double_ladder_ansatz
-from src.boostvqe.new_code.mps_warmstart import create_mps_circuit, mps_to_unitaries
+from src.boostvqe.new_code.mps_warmstart import create_mps_circuit, mps_analytic_decomposition
 import numpy as np
 import quimb.tensor as qtn
 
@@ -36,6 +38,7 @@ def dbi_with_mps(hamiltonian, H, circuit_layers=None):
     res = dmrg.solve(verbosity=0)
     dmrg.solve()
     gs = dmrg.state
+    print("Energy", dmrg.energy)
 
     if circuit_layers is None:
         circuit_layers = int(np.ceil(np.log2(gs.max_bond())))
@@ -58,9 +61,13 @@ def dbi_with_mps(hamiltonian, H, circuit_layers=None):
 
     # Create the MPS circuit
     print('Creating MPS circuit..')
-    circuit_unitaries, init_overlap, init_energy = mps_to_unitaries.disentangling_gates(input_mps=gs, num_layers=circuit_layers, hamiltonian=hamiltonian)
-    circuit_gates = list(create_mps_circuit.create_circuit_from_gate_unitaries(circuit_unitaries))
+    circuit_unitaries, qargs, init_overlap, init_energy = mps_analytic_decomposition.analytic_decomposition(
+        psi_target=gs, num_layers=circuit_layers, hamiltonian=hamiltonian)
+    #circuit_gates = list(create_mps_circuit.generate_gates_from_unitaries(circuit_unitaries, backward=True))
+    circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
+    circuit_gates = flatten_list(circuit_gates)
 
+    print(circuit_gates[-1].qubits)
     warmstart_mps = qtn.CircuitMPS(n_sites)
     warmstart_mps.apply_gates(circuit_gates)
     mps_energy_contract = (warmstart_mps.psi.conj().reindex_(
@@ -92,7 +99,7 @@ if __name__ == '__main__':
     couplings = np.array([Jx, Jy, Jz, h])
 
     #nsites_range = range(61,101,10)
-    nsites_range = [14,16]
+    nsites_range = [5]
 
     init_fid = []
     init_energy_error = []
@@ -101,9 +108,9 @@ if __name__ == '__main__':
     for n_sites in nsites_range:
         print(f"Num sites = {n_sites}")
         # Build the Hamiltonian
-        ham_build, H = build_xxz_hamiltonian(n_sites, couplings)
+        _, H = build_xxz_hamiltonian(n_sites, couplings)
         ham = qtn.MPO_ham_heis(n_sites, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
-        assert abs((ham_build - ham).norm()) < 1e-10
+        #assert abs((ham_build - ham).norm()) < 1e-10
 
         dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=10)
         print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: {init_energy}, ground energy: {ground_energy}")

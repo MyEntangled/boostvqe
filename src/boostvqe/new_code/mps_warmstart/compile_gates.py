@@ -2,7 +2,6 @@ import numpy as np
 import scipy
 
 from qiskit.synthesis import OneQubitEulerDecomposer, TwoQubitBasisDecomposer
-from qiskit import QuantumCircuit
 from qiskit.circuit.library import CXGate
 from qiskit.quantum_info.random import random_unitary
 
@@ -19,17 +18,17 @@ def closest_unitary(A:np.array):
     """ Calculate the unitary matrix U that is closest with respect to the
         operator norm distance to the general matrix A.
 
-        Return U as a numpy matrix.
+        Return U as a numpy array.
     """
-    V, _, Wh = scipy.linalg.svd(A,)
-    U = np.matrix(V.dot(Wh))
-    return U
+    V, _, Wh = scipy.linalg.svd(A)
+    return V @ Wh
 
 def unitary_to_gates(G:np.array):
     #assert is_unitary(G)
 
     assert G.shape[0] == G.shape[1]
     G = closest_unitary(G)
+
 
     d = G.shape[0]
     assert d in [2,4]

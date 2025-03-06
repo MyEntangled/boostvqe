@@ -5,37 +5,27 @@ import quimb as qu
 from typing import List
 
 from src.boostvqe.new_code.mps_warmstart.compile_gates import unitary_to_gates
-from src.boostvqe.new_code.mps_warmstart.mps_to_unitaries import disentangling_gates
+from src.boostvqe.new_code.mps_warmstart.helper import flatten_list
 
-#qtn.set_contract_backend('jax')
-#qtn.set_tensor_linop_backend('jax')
+def generate_gates_from_unitaries(unitaries:List[np.array], qargs:List[tuple]):
+    assert len(qargs) == len(unitaries)
 
-def create_circuit_from_gate_unitaries(unitaries:List[List[np.array]]):
-    num_layers = len(unitaries)
-    for i in range(num_layers):
-        layer = unitaries[num_layers-1-i] # Compose circuit starting from the last layer
+    for n, unitary in enumerate(unitaries):
+        qubits_involved = qargs[n]
 
-        for n, unitary in enumerate(layer):
+        gate_seq = unitary_to_gates(unitary)
 
-            if n == len(layer) - 1:
-                assert unitary.shape[0] == 2
-                qubits_involved = [len(layer)-1]
+        for (gate_name, qubit_order, params) in gate_seq:
+            # print(gate_name, qubit_order, params)
+            if len(params) > 0:
+                yield qtn.Gate(gate_name, params=params, qubits=[qubits_involved[q] for q in qubit_order])
             else:
-                assert unitary.shape[0] == 4
-                qubits_involved = [n, n+1]
-
-            gate_seq = unitary_to_gates(unitary)
-
-            for (gate_name, qubit_order, params) in gate_seq:
-                #print(gate_name, qubit_order, params)
-                if len(params) > 0:
-                    yield qtn.Gate(gate_name, params=params, qubits=[qubits_involved[q] for q in qubit_order], round=i)
-                else:
-                    yield qtn.Gate(gate_name, params=[], qubits=[qubits_involved[q] for q in qubit_order], round=i)
+                yield qtn.Gate(gate_name, params=None, qubits=[qubits_involved[q] for q in qubit_order])
 
 
 if __name__ == "__main__":
-    nqubits = 100
+    from src.boostvqe.new_code.mps_warmstart.mps_analytic_decomposition import analytic_decomposition
+    nqubits = 10
     ham = qtn.MPO_ham_heis(nqubits)
     dmrg = qtn.DMRG2(ham, bond_dims=[16, 32, 64, 128], cutoffs=1e-6)
     res = dmrg.solve(verbosity=0)
@@ -50,9 +40,11 @@ if __name__ == "__main__":
     #qtn.set_contract_backend('jax')
     #qtn.set_tensor_linop_backend('jax')
 
-    circuit_unitaries = disentangling_gates(input_mps=gs, num_layers=10, hamiltonian=ham)
-    circuit_gates = list(create_circuit_from_gate_unitaries(circuit_unitaries))
-    #print(circuit_gates)
+    circuit_unitaries, qargs,_,_ = analytic_decomposition(psi_target=gs, num_layers=10, hamiltonian=ham)
+
+    circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
+    circuit_gates = flatten_list(circuit_gates)
+
 
     circ = qtn.CircuitMPS(nqubits)
     circ.apply_gates(circuit_gates)
