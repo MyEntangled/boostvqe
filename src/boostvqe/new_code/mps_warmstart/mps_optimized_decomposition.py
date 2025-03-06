@@ -7,8 +7,6 @@ import numpy as np
 import quimb.tensor as qtn
 import scipy
 
-import time
-
 def overall_fidelity_mps(unitaries, qargs, psi_target, n):
     """
     Compute the fidelity f = |<psi_target | psi_approx>|,
@@ -55,7 +53,6 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
         tail_circ = apply_circuit_mps(tail_circ, flatten_list(gate_list), apply_inverse=True)
 
         for m in range(M):
-            time_marker = time.time()
             # Compute left state: U'_{m-1} U_{m-2}... U_1 U_0|0^n> = U'_{m-1} |prev. left state>.
             if m > 0:
                 head_circ = apply_circuit_mps(head_circ, flatten_list([gate_list[m - 1]]))
@@ -64,22 +61,13 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
             # Compute right state: U^dg_{m+1}... U^dg_{M-2} U^dg_{M-1}|psi_target> = U_{m} U^dg_m U^dg_{m+1}... U^dg_{M-2} U^dg_{M-1}|psi_target>
             # = U_{m} |prev. right state>
             tail_circ = apply_circuit_mps(tail_circ, gate_list[m])
-            #print("Prepare head/tail", time.time() - time_marker)
-
-            time_marker = time.time()
 
             # Form the operator O = |right_state><left_state|
             outer_product_tensor = outer_product_mps(tail_circ.psi, head_circ.psi.H)
 
-            #print("Compute outer product", time.time() - time_marker)
-
-            time_marker = time.time()
-
             # Compute the environment tensor F_m by tracing out all qubits except those affected by the unitary
             F_m = partial_trace_mpo(outer_product_tensor, keep_sites=qargs[m])
-            #print("Compute partial trace", time.time() - time_marker)
 
-            time_marker = time.time()
             #print(F_m)
             if len(F_m.shape) == 2: # 1-qubit unitary
                 F_m = F_m.data
@@ -107,7 +95,6 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
             U, _, Vh = np.linalg.svd(U_updated)
             Q = U @ Vh
             assert is_unitary(Q)
-            #print("Compute new unitary:", time.time() - time_marker)
 
             # Update the m-th unitary, but qargs unchanged.
             unitaries[m] = Q

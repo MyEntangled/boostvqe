@@ -9,8 +9,7 @@ def to_backend(x):
 
 def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, backend='numpy'):
     """
-    Apply a list of two-qubit gates (each a tuple (U, (q0, q1)))
-    using a CircuitMPS with n qubits.
+    Apply a list gates using a CircuitMPS
     """
     if isinstance(circuit, int):
         circuit = qtn.CircuitMPS(circuit, max_bond=4096, cutoff=1e-8, to_backend=None)
