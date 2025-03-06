@@ -1,18 +1,18 @@
 import numpy as np
 from quimb import tensor as qtn
-import torch
+# import torch
 
-def to_backend(x):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    return torch.tensor(x, dtype=torch.complex64, device=device)
+# def to_backend(x):
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     return torch.tensor(x, dtype=torch.complex64, device=device)
 
 
-def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, backend='numpy'):
+def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, psi0=None, backend='numpy'):
     """
-    Apply a list gates using a CircuitMPS
+    Apply a list gates using a CircuitMPS. The circuit can be initialized to psi0 when created new.
     """
     if isinstance(circuit, int):
-        circuit = qtn.CircuitMPS(circuit, max_bond=4096, cutoff=1e-8, to_backend=None)
+        circuit = qtn.CircuitMPS(circuit, psi0=psi0, max_bond=4096, cutoff=1e-8, to_backend=None)
 
     if not apply_inverse:
         circuit.apply_gates(gates)

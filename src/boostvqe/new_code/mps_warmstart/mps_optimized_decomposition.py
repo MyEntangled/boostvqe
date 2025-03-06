@@ -34,7 +34,7 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
 
     if isinstance(psi_target, qtn.MatrixProductState):
         n = psi_target.num_tensors
-        psi_target_circ = qtn.CircuitMPS(N=n, psi0=psi_target)
+        psi_target_circ = qtn.CircuitMPS(N=n, max_bond=4096, cutoff=1e-8, psi0=psi_target)
     else:
         n = psi_target.N
         psi_target_circ = psi_target.copy()
@@ -48,7 +48,7 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
     print('Time complexity', opt_sweeps * M)
 
     while t < opt_sweeps and fid < fid_target:
-        head_circ = qtn.CircuitMPS(n)  # to apply U_{m-1} ... U_1 U_0|0^n>
+        head_circ = qtn.CircuitMPS(n, max_bond=4096, cutoff=1e-8)  # to apply U_{m-1} ... U_1 U_0|0^n>
         tail_circ = psi_target_circ.copy()  # to apply U^dg_{m+1}... U^dg_{M-2} U^dg_{M-1}|psi_target>
         tail_circ = apply_circuit_mps(tail_circ, flatten_list(gate_list), apply_inverse=True)
 
@@ -62,7 +62,7 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
             # = U_{m} |prev. right state>
             tail_circ = apply_circuit_mps(tail_circ, gate_list[m])
 
-            # Form the operator O = |right_state><left_state|
+            # Form the operator O = |tail><head|
             outer_product_tensor = outer_product_mps(tail_circ.psi, head_circ.psi.H)
 
             # Compute the environment tensor F_m by tracing out all qubits except those affected by the unitary
@@ -110,8 +110,8 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
 
 if __name__ == '__main__':
     np.random.seed(42)
-    n = 50
-    M = 200
+    n = 20
+    M = 100
 
     # Create a "true" circuit to generate the target state.
     true_unitaries = []
@@ -141,5 +141,5 @@ if __name__ == '__main__':
 
     print("Initial guess fidelity:", overall_fidelity_mps(guess_unitaries, guess_qargs, circ.psi, n))
     # Optimize the circuit.
-    optimized_unitaries, qargs, final_fid = optimized_decomposition(circ, guess_unitaries, guess_qargs, opt_sweeps=10, fid_target=0.999, r=0.6)
+    optimized_unitaries, qargs, final_fid = optimized_decomposition(circ, guess_unitaries, guess_qargs, opt_sweeps=1, fid_target=0.999, r=0.6)
     print("Final fidelity:", final_fid)

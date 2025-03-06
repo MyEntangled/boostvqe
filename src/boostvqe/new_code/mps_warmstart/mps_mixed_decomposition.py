@@ -17,7 +17,7 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
         psi_target = psi_target.psi
 
     n = psi_target.num_tensors
-    mps_circ = qtn.CircuitMPS(n)
+    mps_circ = qtn.CircuitMPS(n, max_bond=4096, cutoff=1e-8)
     fid = np.abs(psi_target.H @ mps_circ.psi)
 
     circuit_unitaries = [] ## Including sublists for layers
@@ -33,7 +33,7 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
         print("Analytic decomposition..")
 
         layer_ana_unitaries, layer_qargs, fid, energy = mps_analytic_decomposition.analytic_decomposition(
-            psi_target=apply_circuit_mps(qtn.CircuitMPS(N=n, psi0=psi_target), circuit_gates, apply_inverse=True),
+            psi_target=apply_circuit_mps(n, circuit_gates, apply_inverse=True, psi0=psi_target),
             num_layers=1,
             hamiltonian=hamiltonian,
             fid_target=fid_target)
@@ -69,6 +69,8 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
 
         layer += 1
 
+    return circuit_unitaries, circuit_qargs, circuit_gates, fid
+
 if __name__ == '__main__':
     nqubits = 100
     bond_dim = 128
@@ -89,4 +91,6 @@ if __name__ == '__main__':
     dmrg.solve()
     psi = dmrg.state
 
-    mixed_decomposition(psi, None, 10, 2, 0.98)
+    unitaries, qargs, gates, fid = mixed_decomposition(psi, None, 10, 2, 0.98)
+    ## Reconstruct circuit
+    circ = apply_circuit_mps(nqubits, gates)

@@ -232,7 +232,7 @@ def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, n
     circuit_unitaries = []
     qargs = []
     if hamiltonian is not None:
-        circ = qtn.CircuitMPS(psi_target.num_tensors)
+        circ = qtn.CircuitMPS(psi_target.num_tensors, max_bond=4096, cutoff=1e-8)
 
     energy = None
     fid = np.abs(zero_mps.H @ psi_target)
@@ -309,8 +309,7 @@ if __name__ == "__main__":
     res = dmrg.solve(verbosity=0)
     dmrg.solve()
     psi = dmrg.state
-    circ = qtn.CircuitMPS(N=psi.num_tensors, psi0=psi)
-    print(circ)
+
     # print(psi.max_bond())
     # print(psi.shape)
 
