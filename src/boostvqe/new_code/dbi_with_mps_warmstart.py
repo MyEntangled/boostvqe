@@ -117,7 +117,7 @@ if __name__ == '__main__':
         #assert abs((ham_build - ham).norm()) < 1e-10
 
         dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=2, mode='mixed')
-        print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: , ground energy: {ground_energy}")
+        print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: {init_energy}, ground energy: {ground_energy}")
         print()
         init_fid.append(init_overlap)
         init_energy_error.append((init_energy - ground_energy) / n_sites)
