@@ -2,10 +2,10 @@ from hamiltonian import build_xxz_hamiltonian
 from dbi import dbi_training
 from src.boostvqe.new_code.dbi.dbi_training import train_dbi
 from src.boostvqe.new_code.mps_warmstart.create_mps_circuit import generate_gates_from_unitaries
-from src.boostvqe.new_code.mps_warmstart.helper import flatten_list
+from src.boostvqe.new_code.mps_warmstart.helper import flatten_list, apply_circuit_mps
 from vqe.vqe_training import evaluate, train_vqe
 #from vqe.vqe_ansatz import double_ladder_ansatz
-from src.boostvqe.new_code.mps_warmstart import create_mps_circuit, mps_analytic_decomposition
+from src.boostvqe.new_code.mps_warmstart import create_mps_circuit, mps_analytic_decomposition, mps_mixed_decomposition
 import numpy as np
 import quimb.tensor as qtn
 
@@ -31,7 +31,7 @@ def optimize_dbi(warmstart_circuit, couplings, hamiltonian):
     print(f"DBI optimization done, optimal params = {dbi_params}")
     return dbi_energy
 
-def dbi_with_mps(hamiltonian, H, circuit_layers=None):
+def dbi_with_mps(hamiltonian, H, circuit_layers=None, mode='analytic'):
     # DMRG
     bond_dims = [16, 32, 64, 128]
     dmrg = qtn.DMRG2(hamiltonian, bond_dims=bond_dims, cutoffs=1e-6)
@@ -61,19 +61,23 @@ def dbi_with_mps(hamiltonian, H, circuit_layers=None):
 
     # Create the MPS circuit
     print('Creating MPS circuit..')
-    circuit_unitaries, qargs, init_overlap, init_energy = mps_analytic_decomposition.analytic_decomposition(
-        psi_target=gs, num_layers=circuit_layers, hamiltonian=hamiltonian)
-    #circuit_gates = list(create_mps_circuit.generate_gates_from_unitaries(circuit_unitaries, backward=True))
-    circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
-    circuit_gates = flatten_list(circuit_gates)
+    if mode == 'analytic':
+        circuit_unitaries, qargs, init_overlap, init_energy = mps_analytic_decomposition.analytic_decomposition(
+            psi_target=gs, num_layers=circuit_layers, hamiltonian=hamiltonian)
+        #circuit_gates = list(create_mps_circuit.generate_gates_from_unitaries(circuit_unitaries, backward=True))
+        circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
+        circuit_gates = flatten_list(circuit_gates)
 
-    print(circuit_gates[-1].qubits)
-    warmstart_mps = qtn.CircuitMPS(n_sites)
-    warmstart_mps.apply_gates(circuit_gates)
-    mps_energy_contract = (warmstart_mps.psi.conj().reindex_(
+        warmstart_mps = qtn.CircuitMPS(n_sites)
+        warmstart_mps.apply_gates(circuit_gates)
+    elif mode == 'mixed':
+        unitaries, qargs, gates, init_overlap = mps_mixed_decomposition.mixed_decomposition(gs, None, circuit_layers, 10, 0.99)
+        warmstart_mps = apply_circuit_mps(n_sites, gates)
+
+    init_energy = (warmstart_mps.psi.conj().reindex_(
         {f'k{n}': f'b{n}' for n in range(warmstart_mps.psi.num_tensors)}) | hamiltonian | warmstart_mps.psi) ^ ...
     #mps_energy = evaluate(warmstart_mps, H)
-    print('MPS circuit energy:', mps_energy_contract)
+    print('MPS circuit energy:', init_energy)
     print("Optimizing DBI...")
 
     # Evaluate the DBI
@@ -94,12 +98,12 @@ if __name__ == '__main__':
     # Define parameters for the XXZ Hamiltonian
     Jx = 1  # Coupling in the x-direction
     Jy = 1  # Coupling in the y-direction
-    Jz = 1 # Coupling in the z-direction
-    h = +0.5  # Transverse field strength
+    Jz = 0.5 # Coupling in the z-direction
+    h = 0.  # Transverse field strength
     couplings = np.array([Jx, Jy, Jz, h])
 
     #nsites_range = range(61,101,10)
-    nsites_range = [5]
+    nsites_range = [4]
 
     init_fid = []
     init_energy_error = []
@@ -112,8 +116,8 @@ if __name__ == '__main__':
         ham = qtn.MPO_ham_heis(n_sites, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
         #assert abs((ham_build - ham).norm()) < 1e-10
 
-        dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=10)
-        print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: {init_energy}, ground energy: {ground_energy}")
+        dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=2, mode='mixed')
+        print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: , ground energy: {ground_energy}")
         print()
         init_fid.append(init_overlap)
         init_energy_error.append((init_energy - ground_energy) / n_sites)

@@ -72,12 +72,12 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
     return circuit_unitaries, circuit_qargs, circuit_gates, fid
 
 if __name__ == '__main__':
-    nqubits = 100
-    bond_dim = 128
+    nqubits = 30
+    bond_dim = 64
 
     Jx = 1  # Coupling in the x-direction
     Jy = 1  # Coupling in the y-direction
-    Jz = 1  # Coupling in the z-direction
+    Jz = 0  # Coupling in the z-direction
     h = +0.5  # Transverse field strength
 
     # Build the Hamiltonian
@@ -85,12 +85,13 @@ if __name__ == '__main__':
     ham = qtn.MPO_ham_heis(nqubits, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
 
     #print((ham_build - ham).norm())
-    bond_dims = [4]
+    bond_dims = [64]
     dmrg = qtn.DMRG2(ham, bond_dims=bond_dims, cutoffs=1e-6)
     res = dmrg.solve(verbosity=0)
     dmrg.solve()
     psi = dmrg.state
 
-    unitaries, qargs, gates, fid = mixed_decomposition(psi, None, 10, 2, 0.98)
+    unitaries, qargs, gates, fid = mixed_decomposition(psi, None, 5, 2, 1)
     ## Reconstruct circuit
     circ = apply_circuit_mps(nqubits, gates)
+

@@ -7,7 +7,7 @@ from quimb import tensor as qtn
 #     return torch.tensor(x, dtype=torch.complex64, device=device)
 
 
-def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, psi0=None, backend='numpy'):
+def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, psi0=None):
     """
     Apply a list gates using a CircuitMPS. The circuit can be initialized to psi0 when created new.
     """

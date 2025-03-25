@@ -1,6 +1,36 @@
 import quimb.tensor as qtn
 import numpy as np
 
+def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, psi0=None):
+    """
+    Apply a list gates using a CircuitMPS. The circuit can be initialized to psi0 when created new.
+    """
+    if isinstance(circuit, int):
+        circuit = qtn.CircuitMPS(circuit, psi0=psi0, max_bond=4096, cutoff=1e-8, to_backend=None)
+
+    if not apply_inverse:
+        circuit.apply_gates(gates)
+    else: ## Apply the inverse of the gates (order also reversed)
+        inverse_gates = []
+        for gate in reversed(gates):
+            label = gate.label
+            qubits = gate.qubits
+
+            if gate.params is None:
+                params = None
+            else:
+                if label == 'U3':
+                    params = [-gate.params[0], -gate.params[2], -gate.params[1]]
+                else:
+                    try:
+                        params = [-p for p in gate.params] # Negate parameters
+                    except TypeError:
+                        params = None
+            inverse_gates.append(qtn.Gate(label, params, qubits))
+        circuit.apply_gates(inverse_gates)
+
+    return circuit
+
 def append_circuits(circuit1, circuit2):
     # Append all gates from circuit2 to circuit1
     # for gate in circuit2.gates:

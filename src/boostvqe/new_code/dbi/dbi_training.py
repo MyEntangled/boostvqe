@@ -19,7 +19,7 @@ def train_dbi(couplings, hamiltonian, warmstart):
     params[1:] = np.random.uniform(0., 2 * np.pi, 2 * n_sites - 1)
     # params = jax.device_put(params)
 
-    # Perform the optimization
+    # Perform the optimization  ### CMA-ES optimization for gradient-estimate opt
     result = scipy.optimize.minimize(dbi_cost_function, params, args=(couplings, hamiltonian, warmstart), method='COBYLA')
 
     # Extract the optimal parameters and energy
@@ -61,7 +61,7 @@ def dbi_circuit(warmstart_circuit, couplings, s, params_d):
     n_sites = warmstart_circuit.N
     warmstart_circuit_inv = invert_circuit(warmstart_circuit)
 
-    circuit = qtn.CircuitMPS(n_sites, max_bond=128, cutoff=1e-6)
+    circuit = qtn.CircuitMPS(n_sites, max_bond=2*11, cutoff=1e-8)
     circuit = D(circuit, params_d)
 
     circuit = append_circuits(circuit, warmstart_circuit)

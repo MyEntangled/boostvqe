@@ -268,7 +268,7 @@ def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, n
         qargs = [layer_qargs] + qargs
 
         fid = np.abs(zero_mps.H @ output_mps)
-        #print('Output quality', fid)
+        print('Output quality', fid)
 
         if hamiltonian is not None:
             layer_gates = list(generate_gates_from_unitaries(circuit_unitaries[0], qargs[0]))
@@ -290,13 +290,13 @@ def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, n
 
 
 if __name__ == "__main__":
-    nqubits = 10
-    bond_dim = 4
+    nqubits = 30
+    bond_dim = 64
 
     from src.boostvqe.new_code.hamiltonian import build_xxz_hamiltonian
     Jx = 1  # Coupling in the x-direction
     Jy = 1  # Coupling in the y-direction
-    Jz = 1  # Coupling in the z-direction
+    Jz = 0  # Coupling in the z-direction
     h = +0.5  # Transverse field strength
 
     # Build the Hamiltonian
@@ -313,6 +313,6 @@ if __name__ == "__main__":
     # print(psi.max_bond())
     # print(psi.shape)
 
-    circuit_unitaries, qargs, _, _ = analytic_decomposition(psi, hamiltonian=ham, num_layers=100)
+    circuit_unitaries, qargs, _, _ = analytic_decomposition(psi, hamiltonian=ham, num_layers=5)
     print(len(circuit_unitaries), len(qargs))
 
