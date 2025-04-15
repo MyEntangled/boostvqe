@@ -1,3 +1,9 @@
+import sys
+import os
+#sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+#print(sys.path)
+print(os.getcwd())
+
 from hamiltonian import build_xxz_hamiltonian
 from dbi import dbi_training
 from src.boostvqe.new_code.dbi.dbi_training import train_dbi
@@ -31,7 +37,7 @@ def optimize_dbi(warmstart_circuit, couplings, hamiltonian):
     print(f"DBI optimization done, optimal params = {dbi_params}")
     return dbi_energy
 
-def dbi_with_mps(hamiltonian, H, circuit_layers=None, mode='analytic'):
+def dbi_with_mps(hamiltonian, H, circuit_layers=None, mode='analytic', use_raw_gates=True):
     # DMRG
     bond_dims = [16, 32, 64, 128]
     dmrg = qtn.DMRG2(hamiltonian, bond_dims=bond_dims, cutoffs=1e-6)
@@ -63,16 +69,19 @@ def dbi_with_mps(hamiltonian, H, circuit_layers=None, mode='analytic'):
     print('Creating MPS circuit..')
     if mode == 'analytic':
         circuit_unitaries, qargs, init_overlap, init_energy = mps_analytic_decomposition.analytic_decomposition(
-            psi_target=gs, num_layers=circuit_layers, hamiltonian=hamiltonian)
+            psi_target=gs, num_layers=circuit_layers, hamiltonian=hamiltonian, use_raw_gates=use_raw_gates)
+
         #circuit_gates = list(create_mps_circuit.generate_gates_from_unitaries(circuit_unitaries, backward=True))
-        circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
+        circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k], use_raw_gates=use_raw_gates) for k in range(len(circuit_unitaries))]
         circuit_gates = flatten_list(circuit_gates)
 
         warmstart_mps = qtn.CircuitMPS(n_sites)
         warmstart_mps.apply_gates(circuit_gates)
+
     elif mode == 'mixed':
-        unitaries, qargs, gates, init_overlap = mps_mixed_decomposition.mixed_decomposition(gs, None, circuit_layers, 10, 0.99)
+        unitaries, qargs, gates, init_overlap = mps_mixed_decomposition.mixed_decomposition(gs, None, circuit_layers, 10, 0.99, use_raw_gates=use_raw_gates)
         warmstart_mps = apply_circuit_mps(n_sites, gates)
+
 
     init_energy = (warmstart_mps.psi.conj().reindex_(
         {f'k{n}': f'b{n}' for n in range(warmstart_mps.psi.num_tensors)}) | hamiltonian | warmstart_mps.psi) ^ ...
@@ -103,11 +112,14 @@ if __name__ == '__main__':
     couplings = np.array([Jx, Jy, Jz, h])
 
     #nsites_range = range(61,101,10)
-    nsites_range = [4]
+    nsites_range = [20]
 
     init_fid = []
     init_energy_error = []
     dbi_energy_error = []
+
+    import time
+    start = time.time()
 
     for n_sites in nsites_range:
         print(f"Num sites = {n_sites}")
@@ -116,13 +128,14 @@ if __name__ == '__main__':
         ham = qtn.MPO_ham_heis(n_sites, (4*Jx, 4*Jy, 4*Jz), bz=-2*h)
         #assert abs((ham_build - ham).norm()) < 1e-10
 
-        dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=2, mode='mixed')
+        dbi_energy, init_overlap, init_energy, ground_energy = dbi_with_mps(ham, H, circuit_layers=2, mode='mixed', use_raw_gates=True)
         print(f"n_sites {n_sites}, DBI energy: {dbi_energy}, init overlap: {init_overlap}, init energy: {init_energy}, ground energy: {ground_energy}")
         print()
         init_fid.append(init_overlap)
         init_energy_error.append((init_energy - ground_energy) / n_sites)
         dbi_energy_error.append((dbi_energy - ground_energy) / n_sites)
 
+    print("Time taken:", time.time() - start) ## 202s for raw gates, 391s for non-raw gates
 
 
     # plt.plot(nsites_range, init_fid, label="Initial overlap")

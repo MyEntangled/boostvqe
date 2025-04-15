@@ -9,10 +9,16 @@ import numpy as np
 from src.boostvqe.new_code.mps_warmstart.mps_optimized_decomposition import optimized_decomposition
 
 
-def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, circuit_layers=10, opt_sweeps=10, fid_target=0.99):
+def mixed_decomposition(psi_target: qtn.MatrixProductState,
+                        hamiltonian=None,
+                        circuit_layers=10,
+                        opt_sweeps=10,
+                        fid_target=0.99,
+                        use_raw_gates=True):
     """
     Perform a mixed decomposition of a target MPS, using both the optimized and analytic decompositions.
     """
+
     if isinstance(psi_target, qtn.CircuitMPS):
         psi_target = psi_target.psi
 
@@ -36,14 +42,16 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
             psi_target=apply_circuit_mps(n, circuit_gates, apply_inverse=True, psi0=psi_target),
             num_layers=1,
             hamiltonian=hamiltonian,
-            fid_target=fid_target)
+            fid_target=fid_target,
+            use_raw_gates=use_raw_gates
+        )
 
         assert len(layer_ana_unitaries) == 1
         assert len(layer_qargs) == 1
 
         layer_ana_unitaries = layer_ana_unitaries[0] # index 0 as there's only 1 layer
         layer_qargs = layer_qargs[0]
-        layer_ana_gates = list(generate_gates_from_unitaries(layer_ana_unitaries, layer_qargs))
+        layer_ana_gates = list(generate_gates_from_unitaries(layer_ana_unitaries, layer_qargs, use_raw_gates=use_raw_gates))
 
         ana_circ = apply_circuit_mps(n, layer_ana_gates + circuit_gates)
 
@@ -58,8 +66,10 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
                                                                         layer_qargs + circuit_qargs,
                                                                         opt_sweeps=opt_sweeps,
                                                                         fid_target=fid_target,
-                                                                        r=1)
-        circuit_gates = list(generate_gates_from_unitaries(circuit_unitaries, circuit_qargs))
+                                                                        r=0.6,
+                                                                        use_raw_gates=use_raw_gates)
+
+        circuit_gates = list(generate_gates_from_unitaries(circuit_unitaries, circuit_qargs, use_raw_gates=use_raw_gates))
 
         opt_circ = apply_circuit_mps(n, circuit_gates)
         fid = np.abs(psi_target.H @ opt_circ.psi)
@@ -72,7 +82,7 @@ def mixed_decomposition(psi_target: qtn.MatrixProductState, hamiltonian=None, ci
     return circuit_unitaries, circuit_qargs, circuit_gates, fid
 
 if __name__ == '__main__':
-    nqubits = 30
+    nqubits = 20
     bond_dim = 64
 
     Jx = 1  # Coupling in the x-direction
@@ -91,7 +101,7 @@ if __name__ == '__main__':
     dmrg.solve()
     psi = dmrg.state
 
-    unitaries, qargs, gates, fid = mixed_decomposition(psi, None, 5, 2, 1)
+    unitaries, qargs, gates, fid = mixed_decomposition(psi, None, 3, 2, 1)
     ## Reconstruct circuit
     circ = apply_circuit_mps(nqubits, gates)
 

@@ -12,13 +12,19 @@ def overall_fidelity_mps(unitaries, qargs, psi_target, n):
     Compute the fidelity f = |<psi_target | psi_approx>|,
     where psi_approx is obtained by applying the circuit gates to |0...0>.
     """
-    circuit_gates = generate_gates_from_unitaries(unitaries, qargs)
+    circuit_gates = generate_gates_from_unitaries(unitaries, qargs, use_raw_gates=True)
     circ = apply_circuit_mps(n, circuit_gates)
     psi_approx = circ.psi
 
     return np.abs(psi_target.H @ psi_approx)
 
-def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, unitaries, qargs, opt_sweeps=100, fid_target=0.99, r=0.6):
+def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS,
+                            unitaries,
+                            qargs,
+                            opt_sweeps=100,
+                            fid_target=0.99,
+                            r=0.6,
+                            use_raw_gates=True):
     """
     Optimization loop (Algorithm 2). For a circuit of M gates (acting on n=M+1 qubits),
     we update each gate to locally maximize the fidelity with psi_target.
@@ -42,10 +48,10 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
     fid = overall_fidelity_mps(unitaries, qargs, psi_target_circ.psi, n)
     #print("Initial fidelity:", fid)
 
-    gate_list = [list(generate_gates_from_unitaries([unitaries[i]], [qargs[i]])) for i in range(M)]
+    gate_list = [list(generate_gates_from_unitaries([unitaries[i]], [qargs[i]], use_raw_gates=use_raw_gates)) for i in range(M)]
     t = 0
 
-    print('Time complexity', opt_sweeps * M)
+    print('# of unitaries x optimization sweeps =', opt_sweeps * M)
 
     while t < opt_sweeps and fid < fid_target:
         head_circ = qtn.CircuitMPS(n, max_bond=4096, cutoff=1e-8)  # to apply U_{m-1} ... U_1 U_0|0^n>
@@ -98,9 +104,8 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
 
             # Update the m-th unitary, but qargs unchanged.
             unitaries[m] = Q
-            gate_list[m] = list(generate_gates_from_unitaries([Q], [qargs[m]]))
+            gate_list[m] = list(generate_gates_from_unitaries([Q], [qargs[m]], use_raw_gates=use_raw_gates))
 
-            #print(overall_fidelity_mps(unitaries, qargs, psi_target_circ.psi, n))
 
         fid = overall_fidelity_mps(unitaries, qargs, psi_target_circ.psi, n)
         #print(f"Sweep {t + 1}: Fidelity = {fid:.6f}")
@@ -110,8 +115,8 @@ def optimized_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, 
 
 if __name__ == '__main__':
     np.random.seed(42)
-    n = 20
-    M = 100
+    n = 30
+    M = 50
 
     # Create a "true" circuit to generate the target state.
     true_unitaries = []
@@ -123,11 +128,12 @@ if __name__ == '__main__':
         true_unitaries.append(Q)
         true_qargs.append((m % n, (m + 1) % n ))
 
-    gate_list = [list(generate_gates_from_unitaries([true_unitaries[i]], [true_qargs[i]])) for i in range(M)]
-    print('apply...')
+    gate_list = [list(generate_gates_from_unitaries([true_unitaries[i]], [true_qargs[i]], True)) for i in range(M)]
+
     circ = apply_circuit_mps(n, flatten_list(gate_list))
-    print(len(circ.gates))
-    print(circ.gates)
+    print("Circuit depth =", len(circ.gates))
+    print("Gates =", circ.gates)
+
 
     # Create an initial guess circuit.
     guess_unitaries = []
@@ -140,6 +146,12 @@ if __name__ == '__main__':
         guess_qargs.append((m % n, (m + 1) % n))
 
     print("Initial guess fidelity:", overall_fidelity_mps(guess_unitaries, guess_qargs, circ.psi, n))
+
+
+    import time
     # Optimize the circuit.
-    optimized_unitaries, qargs, final_fid = optimized_decomposition(circ, guess_unitaries, guess_qargs, opt_sweeps=1, fid_target=0.999, r=0.6)
+    start = time.time()
+    optimized_unitaries, qargs, final_fid = optimized_decomposition(circ, guess_unitaries, guess_qargs, opt_sweeps=10, fid_target=0.999, r=0.6, use_raw_gates=True)
     print("Final fidelity:", final_fid)
+
+    print("Time taken:", time.time() - start)

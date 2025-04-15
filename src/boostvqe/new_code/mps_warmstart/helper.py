@@ -7,6 +7,7 @@ from quimb import tensor as qtn
 #     return torch.tensor(x, dtype=torch.complex64, device=device)
 
 
+
 def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False, psi0=None):
     """
     Apply a list gates using a CircuitMPS. The circuit can be initialized to psi0 when created new.
@@ -16,26 +17,33 @@ def apply_circuit_mps(circuit: qtn.CircuitMPS | int, gates, apply_inverse=False,
 
     if not apply_inverse:
         circuit.apply_gates(gates)
+
     else: ## Apply the inverse of the gates (order also reversed)
         inverse_gates = []
         for gate in reversed(gates):
             label = gate.label
             qubits = gate.qubits
 
-            if gate.params is None:
-                params = None
-            else:
-                if label == 'U3':
-                    params = [-gate.params[0], -gate.params[2], -gate.params[1]]
+            if isinstance(gate.params, str) and gate.params == 'raw':
+                inverse_gates.append(qtn.Gate.from_raw(gate.array.T.conj(), qubits=qubits))
+
+            else: ## Non-raw gates (e.g. U3, RX, RY, RZ)
+
+                if gate.params is None:
+                    params = None
                 else:
-                    try:
-                        params = [-p for p in gate.params] # Negate parameters
-                    except TypeError:
-                        params = None
-            inverse_gates.append(qtn.Gate(label, params, qubits))
+                    if label == 'U3':
+                        params = [-gate.params[0], -gate.params[2], -gate.params[1]]
+                    else:
+                        try:
+                            params = [-p for p in gate.params] # Negate parameters
+                        except TypeError:
+                            params = None
+                inverse_gates.append(qtn.Gate(label, params, qubits))
         circuit.apply_gates(inverse_gates)
 
     return circuit
+
 
 def flatten_list(list_of_lists):
     """

@@ -7,20 +7,24 @@ from typing import List
 from src.boostvqe.new_code.mps_warmstart.compile_gates import unitary_to_gates
 from src.boostvqe.new_code.mps_warmstart.helper import flatten_list
 
-def generate_gates_from_unitaries(unitaries:List[np.array], qargs:List[tuple]):
+def generate_gates_from_unitaries(unitaries:List[np.array], qargs:List[tuple], use_raw_gates=True):
     assert len(qargs) == len(unitaries)
 
     for n, unitary in enumerate(unitaries):
         qubits_involved = qargs[n]
 
-        gate_seq = unitary_to_gates(unitary)
+        if use_raw_gates:
+            yield qtn.Gate.from_raw(unitary, qubits=qubits_involved[::-1])
 
-        for (gate_name, qubit_order, params) in gate_seq:
-            # print(gate_name, qubit_order, params)
-            if len(params) > 0:
-                yield qtn.Gate(gate_name, params=params, qubits=[qubits_involved[q] for q in qubit_order])
-            else:
-                yield qtn.Gate(gate_name, params=None, qubits=[qubits_involved[q] for q in qubit_order])
+        else:
+            gate_seq = unitary_to_gates(unitary)
+
+            for (gate_name, qubit_order, params) in gate_seq:
+                # print(gate_name, qubit_order, params)
+                if len(params) > 0:
+                    yield qtn.Gate(gate_name, params=params, qubits=[qubits_involved[q] for q in qubit_order])
+                else:
+                    yield qtn.Gate(gate_name, params=None, qubits=[qubits_involved[q] for q in qubit_order])
 
 
 if __name__ == "__main__":
@@ -42,7 +46,7 @@ if __name__ == "__main__":
 
     circuit_unitaries, qargs,_,_ = analytic_decomposition(psi_target=gs, num_layers=10, hamiltonian=ham)
 
-    circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k]) for k in range(len(circuit_unitaries))]
+    circuit_gates = [generate_gates_from_unitaries(circuit_unitaries[k], qargs[k], use_raw_gates=True) for k in range(len(circuit_unitaries))]
     circuit_gates = flatten_list(circuit_gates)
 
 

@@ -212,7 +212,12 @@ def reorder_indices(mps:qtn.MatrixProductState) -> qtn.MatrixProductState:
         # Reorder indices
         tensor.transpose_(*desired_order)
 
-def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, num_layers:int=1, hamiltonian=None, fid_target=0.99):
+def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS,
+                           num_layers:int=1,
+                           hamiltonian=None,
+                           fid_target=0.99,
+                           use_raw_gates=True):
+    
     if isinstance(psi_target, qtn.CircuitMPS):
         psi_target = psi_target.psi
 
@@ -271,7 +276,7 @@ def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, n
         print('Output quality', fid)
 
         if hamiltonian is not None:
-            layer_gates = list(generate_gates_from_unitaries(circuit_unitaries[0], qargs[0]))
+            layer_gates = list(generate_gates_from_unitaries(circuit_unitaries[0], qargs[0], use_raw_gates=use_raw_gates))
 
             full_circ = apply_circuit_mps(psi_target.num_tensors, layer_gates + list(circ.gates))
 
@@ -285,6 +290,8 @@ def analytic_decomposition(psi_target:qtn.MatrixProductState | qtn.CircuitMPS, n
 
         if fid > fid_target:
             break
+
+    #print(len(circ.gates))
 
     return circuit_unitaries, qargs, fid, energy
 
